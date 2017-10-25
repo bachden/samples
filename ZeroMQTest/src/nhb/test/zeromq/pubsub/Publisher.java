@@ -5,7 +5,7 @@ import java.util.Random;
 import com.nhb.messaging.zmq.ZMQSocket;
 import com.nhb.messaging.zmq.ZMQSocketType;
 
-public class Publisher extends PubSubPatternTest {
+public class Publisher extends PubSubTest {
 
 	public static void main(String[] args) {
 		new Publisher().runTest();

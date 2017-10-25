@@ -18,12 +18,12 @@ public class XReplier extends ZeroMQTest {
 		int numWorkers = 2;
 		final Thread[] threads = new Thread[numWorkers];
 		for (int i = 0; i < threads.length; i++) {
+			final ZMQSocket socket = this.openSocket(INPROC_WORKERS, ZMQSocketType.XREP);
 			threads[i] = new Thread(() -> {
-				ZMQSocket worker = openSocket(INPROC_WORKERS, ZMQSocketType.XREP);
 				while (true) {
-					worker.recv();
+					socket.recv();
 					// System.out.println(req + " to " + Thread.currentThread().getName());
-					worker.send("pong");
+					socket.send("pong");
 				}
 			}, "Worker #" + (i + 1));
 		}
@@ -47,6 +47,12 @@ public class XReplier extends ZeroMQTest {
 		ZMQSocket router = this.openSocket(TCP_8787, ZMQSocketType.ROUTER);
 		ZMQSocket dealer = this.openSocket(INPROC_WORKERS, ZMQSocketType.DEALER);
 
-		router.proxy(dealer);
+		final Thread forwardingThread = router.asyncForwardTo(dealer);
+
+		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+			forwardingThread.interrupt();
+		}));
+
+		System.out.println("Started");
 	}
 }

@@ -6,7 +6,7 @@ import java.util.StringTokenizer;
 import com.nhb.messaging.zmq.ZMQSocket;
 import com.nhb.messaging.zmq.ZMQSocketType;
 
-public class Subscriber extends PubSubPatternTest {
+public class Subscriber extends PubSubTest {
 
 	public static void main(String[] args) {
 		new Subscriber().runTest();
