@@ -16,7 +16,7 @@ public class Subscriber extends PubSubTest {
 		new Thread() {
 			@Override
 			public void run() {
-				ZMQSocket subscriber = openSocket(PUB_SUB_ENDPOINT, ZMQSocketType.SUB);
+				ZMQSocket subscriber = openSocket(PUB_SUB_ENDPOINT, ZMQSocketType.SUB_CONNECT);
 
 				subscriber.subscribe(topic.getBytes());
 

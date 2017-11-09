@@ -13,7 +13,7 @@ public class Pull extends ZeroMQTest {
 
 	@Override
 	protected void test() throws Exception {
-		ZMQSocket socket = this.openSocket("tcp://127.0.0.1:4567", ZMQSocketType.PULL_CONSUMER);
+		ZMQSocket socket = this.openSocket("tcp://127.0.0.1:4567", ZMQSocketType.PULL_CONNECT);
 		while (true) {
 			System.out.println(new String(socket.recv()));
 		}

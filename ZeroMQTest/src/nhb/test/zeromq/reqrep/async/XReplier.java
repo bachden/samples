@@ -1,5 +1,8 @@
 package nhb.test.zeromq.reqrep.async;
 
+import java.util.ArrayList;
+import java.util.Collection;
+
 import com.nhb.messaging.zmq.ZMQSocket;
 import com.nhb.messaging.zmq.ZMQSocketType;
 
@@ -18,7 +21,7 @@ public class XReplier extends ZeroMQTest {
 		int numWorkers = 2;
 		final Thread[] threads = new Thread[numWorkers];
 		for (int i = 0; i < threads.length; i++) {
-			final ZMQSocket socket = this.openSocket(INPROC_WORKERS, ZMQSocketType.XREP);
+			final ZMQSocket socket = this.openSocket(INPROC_WORKERS, ZMQSocketType.REP_CONNECT);
 			threads[i] = new Thread(() -> {
 				while (true) {
 					socket.recv();
@@ -44,13 +47,18 @@ public class XReplier extends ZeroMQTest {
 	@Override
 	protected void test() throws Exception {
 		this.initWorkers();
-		ZMQSocket router = this.openSocket(TCP_8787, ZMQSocketType.ROUTER);
-		ZMQSocket dealer = this.openSocket(INPROC_WORKERS, ZMQSocketType.DEALER);
+		ZMQSocket router = this.openSocket(TCP_8787, ZMQSocketType.ROUTER_BIND);
+		ZMQSocket dealer = this.openSocket(INPROC_WORKERS, ZMQSocketType.DEALER_BIND);
 
-		final Thread forwardingThread = router.asyncForwardTo(dealer);
+		Collection<Thread> threads = new ArrayList<>();
+		for (int i = 0; i < 1; i++) {
+			threads.add(router.asyncForwardTo(dealer));
+		}
 
 		Runtime.getRuntime().addShutdownHook(new Thread(() -> {
-			forwardingThread.interrupt();
+			for (Thread forwardingThread : threads) {
+				forwardingThread.interrupt();
+			}
 		}));
 
 		System.out.println("Started");

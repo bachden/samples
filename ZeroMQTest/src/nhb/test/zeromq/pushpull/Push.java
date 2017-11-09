@@ -13,7 +13,7 @@ public class Push extends ZeroMQTest {
 
 	@Override
 	protected void test() throws Exception {
-		ZMQSocket socket = this.openSocket("tcp://127.0.0.1:4567", ZMQSocketType.PUSH_PRODUCER);
+		ZMQSocket socket = this.openSocket("tcp://127.0.0.1:4567", ZMQSocketType.PUSH_BIND);
 		Thread.sleep(1000);
 		System.out.println("Start sending...");
 		for (int i = 1; i <= 10; i++) {

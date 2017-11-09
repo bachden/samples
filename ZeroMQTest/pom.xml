@@ -21,7 +21,7 @@
 		<dependency>
 			<groupId>nhb.common</groupId>
 			<artifactId>nhb-common-messaging</artifactId>
-			<version>1.4.0</version>
+			<version>1.4.2</version>
 		</dependency>
 	</dependencies>
 </project>

@@ -8,7 +8,7 @@ import com.nhb.messaging.zmq.ZMQSocketType;
 
 public abstract class ZeroMQTest {
 
-	private final ZMQSocketRegistry socketRegistry = new ZMQSocketRegistry(2, true);
+	private final ZMQSocketRegistry socketRegistry = new ZMQSocketRegistry(4, true);
 
 	public ZMQSocket openSocket(String addr, ZMQSocketType type) {
 		return socketRegistry.openSocket(addr, type);

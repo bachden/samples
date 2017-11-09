@@ -12,28 +12,26 @@ public class Requester extends ZeroMQTest {
 	}
 
 	private void send() {
-		ZMQSocket socket = this.openSocket("tcp://127.0.0.1:8787", ZMQSocketType.REQ);
+		ZMQSocket socket = this.openSocket("tcp://127.0.0.1:8787", ZMQSocketType.REQ_CONNECT);
 
 		int numMessages = (int) 1e5;
-		Long startTime = null;
-		for (int i = 0; i < numMessages; i++) {
+		long startTime = System.nanoTime();
+		int i = 0;
+		for (; i < numMessages; i++) {
 			if (socket.send("ping")) {
-				if (startTime == null) {
-					startTime = System.nanoTime();
-				}
 				socket.recv();
 			} else {
 				System.out.println("Cannot send message");
+				break;
 			}
 		}
-
 		Long totalTime = System.nanoTime() - startTime;
-		System.out.println("message per sec: " + numMessages / (totalTime.doubleValue() / 1e9));
+		System.out.println("message per sec: " + i / (totalTime.doubleValue() / 1e9));
 	}
 
 	@Override
 	protected void test() throws Exception {
-		int numThreads = 2;
+		int numThreads = 7;
 		Thread[] threads = new Thread[numThreads];
 		for (int i = 0; i < numThreads; i++) {
 			threads[i] = new Thread(() -> {

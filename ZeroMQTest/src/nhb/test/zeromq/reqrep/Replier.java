@@ -13,7 +13,7 @@ public class Replier extends ZeroMQTest {
 
 	@Override
 	protected void test() throws Exception {
-		ZMQSocket socket = this.openSocket("tcp://127.0.0.1:8787", ZMQSocketType.REP);
+		ZMQSocket socket = this.openSocket("tcp://127.0.0.1:8787", ZMQSocketType.REP_BIND);
 
 		while (true) {
 			socket.recv();

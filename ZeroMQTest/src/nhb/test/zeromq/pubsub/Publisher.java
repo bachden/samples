@@ -13,7 +13,7 @@ public class Publisher extends PubSubTest {
 
 	@Override
 	protected void test() throws Exception {
-		ZMQSocket publisher = this.openSocket(PUB_SUB_ENDPOINT, ZMQSocketType.PUB);
+		ZMQSocket publisher = this.openSocket(PUB_SUB_ENDPOINT, ZMQSocketType.PUB_BIND);
 
 		Thread.sleep(1000);
 
