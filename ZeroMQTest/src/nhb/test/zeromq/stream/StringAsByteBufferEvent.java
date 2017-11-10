@@ -3,6 +3,7 @@ package nhb.test.zeromq.stream;
 import java.nio.ByteBuffer;
 
 import com.lmax.disruptor.EventFactory;
+import com.lmax.disruptor.EventTranslatorOneArg;
 
 import lombok.Getter;
 
@@ -16,7 +17,8 @@ public class StringAsByteBufferEvent {
 	@Getter
 	private String message;
 
-	@Getter
+	private long sequence;
+
 	private ByteBuffer buffer;
 
 	private int index(long sequence) {
@@ -28,19 +30,23 @@ public class StringAsByteBufferEvent {
 	}
 
 	public void reset(long sequence, String message) {
-		int index = index(sequence);
-		int position = index << this.exponent;
-		int limit = position + entrySize;
-
-		// System.out.println("Index: " + index + ", offset: " + position + ", limit:" +
-		// limit + ", message length: "
-		// + message.length());
-
-		ByteBuffer byteBuffer = this.sharedByteBuffer.duplicate();
-		byteBuffer.position(position).limit(limit);
-
-		this.buffer = byteBuffer;
+		this.buffer = null;
+		this.sequence = sequence;
 		this.message = message;
+	}
+
+	public ByteBuffer getBuffer() {
+		if (this.buffer == null) {
+			int index = index(sequence);
+			int position = index << this.exponent;
+			int limit = position + entrySize;
+
+			ByteBuffer byteBuffer = this.sharedByteBuffer.duplicate();
+			byteBuffer.position(position).limit(limit);
+
+			this.buffer = byteBuffer;
+		}
+		return this.buffer;
 	}
 
 	private StringAsByteBufferEvent(ByteBuffer sharedByteBuffer, int entrySize, int mask) {
@@ -58,6 +64,7 @@ public class StringAsByteBufferEvent {
 
 		final int mask = bufferSize - 1;
 		final ByteBuffer sharedByteBuffer = ByteBuffer.allocateDirect(bufferSize * entrySize);
+		// sharedByteBuffer.order(ByteOrder.nativeOrder());
 
 		return new EventFactory<StringAsByteBufferEvent>() {
 
@@ -67,4 +74,12 @@ public class StringAsByteBufferEvent {
 			}
 		};
 	}
+
+	public static final EventTranslatorOneArg<StringAsByteBufferEvent, String> TRANSLATOR = new EventTranslatorOneArg<StringAsByteBufferEvent, String>() {
+
+		@Override
+		public void translateTo(StringAsByteBufferEvent event, long sequence, String message) {
+			event.reset(sequence, message);
+		}
+	};
 }

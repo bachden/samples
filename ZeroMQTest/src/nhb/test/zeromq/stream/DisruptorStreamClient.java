@@ -9,9 +9,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.zeromq.ZMQ;
 import org.zeromq.ZMQException;
 
-import com.lmax.disruptor.BusySpinWaitStrategy;
+import com.lmax.disruptor.EventFactory;
 import com.lmax.disruptor.EventHandler;
-import com.lmax.disruptor.ExceptionHandler;
+import com.lmax.disruptor.YieldingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.nhb.common.utils.TimeWatcher;
@@ -20,10 +20,13 @@ import com.nhb.messaging.zmq.ZMQSocketType;
 
 import nhb.test.zeromq.ZeroMQTest;
 
-public class StreamClient extends ZeroMQTest {
+public class DisruptorStreamClient extends ZeroMQTest {
 
-	private static final int ENTRY_SIZE = 4096;
+	private static final int ENTRY_SIZE = 1024 * 16;
 	private static final int BUFFER_SIZE = 4096 * 16;
+
+	private EventFactory<StringAsByteBufferEvent> eventFactory = StringAsByteBufferEvent.newFactory(BUFFER_SIZE,
+			ENTRY_SIZE);
 
 	private final ThreadFactory threadFactory = new ThreadFactory() {
 
@@ -33,16 +36,21 @@ public class StreamClient extends ZeroMQTest {
 		public Thread newThread(Runnable r) {
 			return new Thread(r, String.format("Thread #%d", idSeed.getAndIncrement()));
 		}
-	};;
+	};
 
 	public static void main(String[] args) {
-		new StreamClient().runTest();
+		new DisruptorStreamClient().runTest();
 	}
 
 	@SuppressWarnings("unchecked")
 	@Override
 	protected void test() throws Exception {
-		final ZMQSocket socket = this.openSocket("tcp://10.0.1.42:8787", ZMQSocketType.STREAM_CONNECT);
+		final int total = (int) 1e6;
+		int msgSize = 1024 * 4;
+
+		DecimalFormat df = new DecimalFormat("###,###.##");
+		final TimeWatcher timeWatcher = new TimeWatcher();
+		final ZMQSocket socket = this.openSocket("tcp://localhost:8787", ZMQSocketType.STREAM_CONNECT);
 
 		CountDownLatch connectedSignal = new CountDownLatch(1);
 		AtomicBoolean connected = new AtomicBoolean(false);
@@ -67,21 +75,17 @@ public class StreamClient extends ZeroMQTest {
 
 		connectedSignal.await();
 
-		final int total = (int) 1e6;
-		int msgSize = 1024;
+		double totalDataSize = Double.valueOf(msgSize + 4) * total; // 4 for reversed int length value
+		double dataMB = totalDataSize / (1024 * 1024);
+		double dataGB = dataMB / 1024;
 
 		StringBuffer sb = new StringBuffer();
 		for (int i = 0; i < msgSize; i++) {
 			sb.append("a");
 		}
 
-		DecimalFormat df = new DecimalFormat("###,###.##");
-
-		double totalDataSize = Double.valueOf(msgSize + 4) * total; // 4 for reversed int length value
-		double dataMB = totalDataSize / (1024 * 1024);
-		double dataGB = dataMB / 1024;
-
 		String msg = sb.toString();
+
 		System.out.println("Message size: " + df.format(msgSize) + " Bytes"
 				+ (msgSize >= 1024
 						? (" == " + (msgSize > 1024 * 1024 ? (df.format(Double.valueOf(msgSize) / 1024 / 1024) + "MB")
@@ -91,53 +95,28 @@ public class StreamClient extends ZeroMQTest {
 		System.out.println("Total size: " + df.format(dataMB) + "MB"
 				+ (dataMB >= 1024 ? (" == " + df.format(dataGB) + "GB") : ""));
 
-		Disruptor<StringAsByteBufferEvent> disruptor = new Disruptor<StringAsByteBufferEvent>( //
-				StringAsByteBufferEvent.newFactory(BUFFER_SIZE, ENTRY_SIZE)//
+		Disruptor<StringAsByteBufferEvent> disruptor = new Disruptor<StringAsByteBufferEvent>(eventFactory //
 				, BUFFER_SIZE //
-				, threadFactory//
-				, ProducerType.SINGLE//
-				, new BusySpinWaitStrategy());
+				, threadFactory //
+				, ProducerType.SINGLE //
+				, new YieldingWaitStrategy());
 
 		final CountDownLatch doneSignal = new CountDownLatch(1);
 
-		disruptor.handleEventsWithWorkerPool(StringAsByteBufferEventPreparingWorker.createHandlers(3))
+		disruptor.handleEventsWithWorkerPool(StringAsByteBufferEventPreparingWorker.createHandlers(7))
 				.then(new EventHandler<StringAsByteBufferEvent>() {
-
-					@Override
-					public void onEvent(StringAsByteBufferEvent event, long sequence, boolean endOfBatch)
-							throws Exception {
-						socket.sendZeroCopy(event.getBuffer(), event.size(), ZMQ.NOBLOCK);
-					}
-				}).then(new EventHandler<StringAsByteBufferEvent>() {
-
 					private int countDown = total;
 
 					@Override
 					public void onEvent(StringAsByteBufferEvent event, long sequence, boolean endOfBatch)
 							throws Exception {
+						socket.sendZeroCopy(event.getBuffer(), event.size(), ZMQ.NOBLOCK);
+						// socket.send(event.getBuffer().array(), ZMQ.NOBLOCK);
 						if (--this.countDown == 0) {
 							doneSignal.countDown();
 						}
 					}
 				});
-
-		disruptor.setDefaultExceptionHandler(new ExceptionHandler<StringAsByteBufferEvent>() {
-
-			@Override
-			public void handleEventException(Throwable ex, long sequence, StringAsByteBufferEvent event) {
-				ex.printStackTrace();
-			}
-
-			@Override
-			public void handleOnStartException(Throwable ex) {
-				ex.printStackTrace();
-			}
-
-			@Override
-			public void handleOnShutdownException(Throwable ex) {
-				ex.printStackTrace();
-			}
-		});
 
 		connectedSignal.await();
 		recvThread.interrupt();
@@ -145,12 +124,11 @@ public class StreamClient extends ZeroMQTest {
 		disruptor.start();
 		System.out.println("******** Disruptor started **********");
 
-		TimeWatcher timeWatcher = new TimeWatcher();
 		timeWatcher.reset();
 
 		int count = total;
 		while (count-- > 0) {
-			disruptor.publishEvent(StringAsByteBufferEventTranslator.DEFAULT, msg);
+			disruptor.publishEvent(StringAsByteBufferEvent.TRANSLATOR, msg);
 		}
 
 		long timeNano = timeWatcher.getNano();

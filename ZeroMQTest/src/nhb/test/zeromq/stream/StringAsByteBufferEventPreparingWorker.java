@@ -1,10 +1,17 @@
 package nhb.test.zeromq.stream;
 
 import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.Charset;
+import java.nio.charset.CharsetEncoder;
 
 import com.lmax.disruptor.WorkHandler;
 
+import nhb.test.zeromq.utils.UnsafeUtils;
+
 public class StringAsByteBufferEventPreparingWorker implements WorkHandler<StringAsByteBufferEvent> {
+
+	private final CharsetEncoder encoder = Charset.defaultCharset().newEncoder();
 
 	public static StringAsByteBufferEventPreparingWorker[] createHandlers(int size) {
 		if (size > 0) {
@@ -21,6 +28,9 @@ public class StringAsByteBufferEventPreparingWorker implements WorkHandler<Strin
 	public void onEvent(StringAsByteBufferEvent event) throws Exception {
 		ByteBuffer buffer = event.getBuffer();
 		buffer.putInt(event.getMessage().length());
-		buffer.put(event.getMessage().getBytes());
+
+		char[] chars = UnsafeUtils.getStringValue(event.getMessage());
+		CharBuffer cb = CharBuffer.wrap(chars);
+		encoder.encode(cb, buffer, true);
 	}
 }
