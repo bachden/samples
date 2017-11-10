@@ -72,8 +72,9 @@ public class StreamServer extends ZeroMQTest {
 			// socket.recv(size, 0, 4, 0);
 			// int length = ByteBuffer.wrap(size).getInt();
 			// System.out.println("Length: " + length);
-			byte[] data = socket.recv();
-			System.out.println("got data: " + new String(data));
+			// byte[] data =
+			socket.recv();
+			// System.out.println("got data: " + new String(data));
 			// System.out.println("Received from id: " + Arrays.toString(clientId) + " ->
 			// body: " + new String(body));
 			final int currCount = count.getAndDecrement();
