@@ -22,7 +22,7 @@ import nhb.test.zeromq.ZeroMQTest;
 
 public class DisruptorStreamClient extends ZeroMQTest {
 
-	private static final int ENTRY_SIZE = 1024 * 16;
+	private static final int ENTRY_SIZE = 1024 * 8;
 	private static final int BUFFER_SIZE = 4096 * 16;
 
 	private EventFactory<StringAsByteBufferEvent> eventFactory = StringAsByteBufferEvent.newFactory(BUFFER_SIZE,
