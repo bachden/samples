@@ -2,12 +2,17 @@ package nhb.test.zeromq;
 
 import org.zeromq.ZMQ.Socket;
 
+import com.nhb.common.Loggable;
 import com.nhb.messaging.zmq.ZMQSocket;
 import com.nhb.messaging.zmq.ZMQSocketRegistry;
 import com.nhb.messaging.zmq.ZMQSocketType;
 
-public abstract class ZeroMQTest {
+import lombok.AccessLevel;
+import lombok.Getter;
 
+public abstract class ZeroMQTest implements Loggable {
+
+	@Getter(AccessLevel.PROTECTED)
 	private final ZMQSocketRegistry socketRegistry = new ZMQSocketRegistry(4, true);
 
 	public ZMQSocket openSocket(String addr, ZMQSocketType type) {
