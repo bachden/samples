@@ -71,8 +71,12 @@ public class ZMQStreamSocketSender implements WorkHandler<MessageBufferEvent>, E
 			byte[] id = new byte[5];
 			while (!Thread.currentThread().isInterrupted()) {
 				socket.recv(id, 0, 5, 0);
-				List<PuElement> messages = cumulator.receive(socket.recv());
-				getLogger().debug("Got messages: {}", messages);
+				byte[] data = socket.recv();
+				getLogger().debug("Got {} bytes data", data.length);
+				List<PuElement> messages = cumulator.receive(data);
+				if (messages != null && !messages.isEmpty()) {
+					getLogger().debug("Got messages: {}", messages);
+				}
 			}
 		});
 		receiver.start();

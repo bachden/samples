@@ -143,6 +143,8 @@ public class DisruptorStreamServer extends ZeroMQTest {
 				}
 			});
 
+			responder.start();
+			
 			while (!Thread.currentThread().isInterrupted()) {
 				byte[] id = new byte[5];
 
@@ -158,6 +160,7 @@ public class DisruptorStreamServer extends ZeroMQTest {
 
 			socket.close();
 			producer.shutdown();
+			responder.shutdown();
 
 		}, "Receiving Thread");
 
