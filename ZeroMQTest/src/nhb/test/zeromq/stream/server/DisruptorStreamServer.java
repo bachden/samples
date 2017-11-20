@@ -1,7 +1,11 @@
 package nhb.test.zeromq.stream.server;
 
+import java.util.LinkedList;
+import java.util.List;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.zeromq.ZMQ.Msg;
 
 import com.lmax.disruptor.BatchEventProcessor;
 import com.lmax.disruptor.EventFactory;
@@ -11,7 +15,6 @@ import com.lmax.disruptor.RingBuffer;
 import com.lmax.disruptor.SequenceBarrier;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.nhb.common.data.PuElement;
-import com.nhb.common.vo.ByteArrayWrapper;
 import com.nhb.messaging.zmq.ZMQSocket;
 import com.nhb.messaging.zmq.ZMQSocketType;
 
@@ -55,15 +58,15 @@ public class DisruptorStreamServer extends ZeroMQTest {
 	};
 
 	@SuppressWarnings("unchecked")
-	private ZMQSocketEventProducer initReceivingWorkers(int numWorkers, EventHandler<MessagePieceEvent> eventHandler) {
+	private ZMQMessagePieceReceiver initReceiver(int numWorkers, EventHandlerInitializer handlerInitializer) {
 
 		RingBuffer<MessagePieceEvent>[] ringBuffers = new RingBuffer[numWorkers];
-		SequenceBarrier[] barries = new SequenceBarrier[numWorkers];
+		SequenceBarrier[] barriers = new SequenceBarrier[numWorkers];
 
-		Thread[] threads = new Thread[numWorkers + 1];
+		List<Thread> threads = new LinkedList<>();
 
 		for (int i = 0; i < numWorkers; i++) {
-			ZMQStreamSocketReceiver receiver = new ZMQStreamSocketReceiver();
+			final ZMQStreamSocketReceiver receiver = new ZMQStreamSocketReceiver();
 
 			RingBuffer<MessagePieceEvent> ringBuffer = RingBuffer.createSingleProducer(eventFactory, BUFFER_SIZE);
 			BatchEventProcessor<MessagePieceEvent> processor = new BatchEventProcessor<>(ringBuffer,
@@ -72,23 +75,18 @@ public class DisruptorStreamServer extends ZeroMQTest {
 			processor.setExceptionHandler(exceptionHandler);
 
 			ringBuffers[i] = ringBuffer;
-			threads[i] = threadFactory.newThread(processor);
-			barries[i] = ringBuffer.newBarrier(processor.getSequence());
+			threads.add(threadFactory.newThread(processor));
+			barriers[i] = ringBuffer.newBarrier(processor.getSequence());
 		}
 
-		MultiBufferBatchEventProcessor<MessagePieceEvent> processor = new MultiBufferBatchEventProcessor<MessagePieceEvent>(
-				ringBuffers, barries, eventHandler);
+		Runnable processor = handlerInitializer.initHandlers(ringBuffers, barriers);
+		threads.add(threadFactory.newThread(processor));
 
-		for (int i = 0; i < ringBuffers.length; i++) {
-			ringBuffers[i].addGatingSequences(processor.getSequences()[i]);
-		}
-
-		threads[numWorkers] = threadFactory.newThread(processor);
 		for (Thread thread : threads) {
 			thread.start();
 		}
 
-		return new ZMQSocketEventProducer() {
+		return new ZMQMessagePieceReceiver() {
 
 			@Override
 			public void shutdown() {
@@ -97,7 +95,7 @@ public class DisruptorStreamServer extends ZeroMQTest {
 				}
 			}
 
-			private void publish(RingBuffer<MessagePieceEvent> ringBuffer, ByteArrayWrapper id, byte[] data) {
+			private void publish(RingBuffer<MessagePieceEvent> ringBuffer, int id, byte[] data) {
 				long sequence = ringBuffer.next();
 				try {
 					MessagePieceEvent event = ringBuffer.get(sequence);
@@ -111,8 +109,8 @@ public class DisruptorStreamServer extends ZeroMQTest {
 			}
 
 			@Override
-			public void publish(ByteArrayWrapper id, byte[] data) {
-				RingBuffer<MessagePieceEvent> ringBuffer = ringBuffers[id.hashCode() % numWorkers];
+			public void publish(int id, byte[] data) {
+				RingBuffer<MessagePieceEvent> ringBuffer = ringBuffers[Math.abs(id % numWorkers)];
 				this.publish(ringBuffer, id, data);
 			}
 		};
@@ -127,39 +125,51 @@ public class DisruptorStreamServer extends ZeroMQTest {
 
 		Thread recvThread = new Thread(() -> {
 
-			final ZMQSocket socket = this.openSocket("tcp://*:8787", ZMQSocketType.STREAM_BIND);
+			final ZMQSocket socket = this.openSocket("tcp://*:8787", ZMQSocketType.SERVER);
 
 			final ZMQSocketResponder responder = initResponder(socket);
 
-			final ZMQSocketEventProducer producer = this.initReceivingWorkers(4, new EventHandler<MessagePieceEvent>() {
+			final ZMQMessagePieceReceiver receiver = this.initReceiver(4, new EventHandlerInitializer() {
 
 				@Override
-				public void onEvent(MessagePieceEvent event, long sequence, boolean endOfBatch) throws Exception {
-					if (event.getExtractedMessages() != null) {
-						for (PuElement message : event.getExtractedMessages()) {
-							responder.send(event.getId().getSource(), message);
-						}
+				public Runnable initHandlers(RingBuffer<MessagePieceEvent>[] ringBuffers, SequenceBarrier[] barriers) {
+					MultiBufferBatchEventProcessor<MessagePieceEvent> processor = new MultiBufferBatchEventProcessor<MessagePieceEvent>(
+							ringBuffers, barriers, new EventHandler<MessagePieceEvent>() {
+
+								// private int count = 0;
+
+								@Override
+								public void onEvent(MessagePieceEvent event, long sequence, boolean endOfBatch)
+										throws Exception {
+									if (event.getExtractedMessages() != null) {
+										// count += event.getExtractedMessages().size();
+										// getLogger().debug("Received messages: {}, first one: {}", count,
+										// event.getExtractedMessages().get(0));
+
+										for (PuElement message : event.getExtractedMessages()) {
+											// getLogger().debug("Sending response...");
+											responder.send(event.getId(), message);
+										}
+									}
+								}
+							});
+
+					for (int i = 0; i < ringBuffers.length; i++) {
+						ringBuffers[i].addGatingSequences(processor.getSequences()[i]);
 					}
+					return processor;
 				}
 			});
 
 			responder.start();
-			
-			while (!Thread.currentThread().isInterrupted()) {
-				byte[] id = new byte[5];
 
-				int readBytes = socket.recv(id, 0, 5, 0);
-				if (readBytes == 5) {
-					ByteArrayWrapper wrappedId = ByteArrayWrapper.newInstance(id);
-					byte[] data = socket.recv();
-					if (data != null) {
-						producer.publish(wrappedId, data);
-					}
-				}
+			while (!Thread.currentThread().isInterrupted()) {
+				Msg msg = (Msg) socket.recvMsg(0);
+				receiver.publish(msg.getRoutingId(), msg.getData());
 			}
 
 			socket.close();
-			producer.shutdown();
+			receiver.shutdown();
 			responder.shutdown();
 
 		}, "Receiving Thread");

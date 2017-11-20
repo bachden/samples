@@ -4,8 +4,9 @@ import java.nio.ByteBuffer;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import org.zeromq.ZMQ;
+import org.zeromq.ZMQ.Msg;
 
+import com.lmax.disruptor.EventFactory;
 import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.EventReleaser;
 import com.lmax.disruptor.RingBuffer;
@@ -16,9 +17,9 @@ import com.nhb.common.Loggable;
 import com.nhb.common.data.PuElement;
 import com.nhb.messaging.zmq.ZMQSocket;
 
+import lombok.Data;
 import lombok.Setter;
 import nhb.test.zeromq.stream.client.ByteBufferOutputStream;
-import nhb.test.zeromq.stream.client.MessageBufferEvent;
 
 public class ZMQSocketResponder implements Loggable {
 
@@ -33,12 +34,28 @@ public class ZMQSocketResponder implements Loggable {
 	// private final int mask;
 	// private final int exponent;
 
-	private EventHandler<MessageBufferEvent> responder = new EventHandler<MessageBufferEvent>() {
+	@Data
+	public static final class ResponseEvent {
+		public static final EventFactory<ResponseEvent> FACTORY = new EventFactory<ZMQSocketResponder.ResponseEvent>() {
+
+			@Override
+			public ResponseEvent newInstance() {
+				return new ResponseEvent();
+			}
+		};
+
+		private int socketId;
+		private PuElement message;
+	}
+
+	private EventHandler<ResponseEvent> responder = new EventHandler<ResponseEvent>() {
 
 		@Override
-		public void onEvent(MessageBufferEvent event, long sequence, boolean endOfBatch) throws Exception {
+		public void onEvent(ResponseEvent event, long sequence, boolean endOfBatch) throws Exception {
 			buffer.clear();
+			// ByteBuffer buffer = ByteBuffer.allocate(entrySize);
 			buffer.mark();
+			int offset = buffer.position();
 
 			// reserved 4 bytes for length prepend
 			buffer.position(buffer.position() + INTEGER_TYPE_SIZE);
@@ -48,15 +65,23 @@ public class ZMQSocketResponder implements Loggable {
 			buffer.reset();
 			buffer.putInt(trunkSize - INTEGER_TYPE_SIZE);
 
-			socket.send(event.getSocketId(), ZMQ.SNDMORE);
-			if (!socket.send(buffer.array(), 0, trunkSize, ZMQ.NOBLOCK)) {
-				throw new RuntimeException("Message couldn't be sent");
+			Msg msg = new Msg();
+			msg.setData(buffer.array());
+			msg.setRoutingId(event.getSocketId());
+			msg.setLength(trunkSize);
+			msg.setOffset(offset);
+
+			if (!socket.sendMsg(msg, 0)) {
+				getLogger().error("Send response message error", new RuntimeException("Message couldn't be sent"));
+			} else {
+				// getLogger().debug("Sent {} bytes data to {}", trunkSize,
+				// Arrays.toString(event.getSocketId()));
 			}
 		}
 	};
 
-	private RingBuffer<MessageBufferEvent> ringBuffer;
-	private Disruptor<MessageBufferEvent> disruptor;
+	private RingBuffer<ResponseEvent> ringBuffer;
+	private Disruptor<ResponseEvent> disruptor;
 
 	public ZMQSocketResponder(ZMQSocket socket, int exponent, ProducerType producerType) {
 		this.socket = socket;
@@ -69,10 +94,10 @@ public class ZMQSocketResponder implements Loggable {
 		this.initDisruptor(producerType);
 	}
 
-	public void send(byte[] socketId, PuElement message) {
+	public void send(int socketId, PuElement message) {
 		long sequence = ringBuffer.next();
 		try {
-			MessageBufferEvent event = this.ringBuffer.get(sequence);
+			ResponseEvent event = this.ringBuffer.get(sequence);
 			event.setSocketId(socketId);
 			event.setMessage(message);
 		} finally {
@@ -82,16 +107,15 @@ public class ZMQSocketResponder implements Loggable {
 
 	@SuppressWarnings("unchecked")
 	private void initDisruptor(ProducerType producerType) {
-		Disruptor<MessageBufferEvent> disruptor = new Disruptor<>(MessageBufferEvent.newFactory(), 1024,
-				new ThreadFactory() {
+		Disruptor<ResponseEvent> disruptor = new Disruptor<>(ResponseEvent.FACTORY, 4096, new ThreadFactory() {
 
-					private final AtomicInteger idSeed = new AtomicInteger(0);
+			private final AtomicInteger idSeed = new AtomicInteger(0);
 
-					@Override
-					public Thread newThread(Runnable r) {
-						return new Thread(r, String.format("Responding thread #%d", idSeed.incrementAndGet()));
-					}
-				}, producerType, new YieldingWaitStrategy());
+			@Override
+			public Thread newThread(Runnable r) {
+				return new Thread(r, String.format("Responding thread #%d", idSeed.incrementAndGet()));
+			}
+		}, producerType, new YieldingWaitStrategy());
 
 		disruptor.handleEventsWith(this.responder);
 		this.disruptor = disruptor;

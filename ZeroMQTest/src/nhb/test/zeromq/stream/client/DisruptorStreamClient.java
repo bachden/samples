@@ -1,17 +1,18 @@
 package nhb.test.zeromq.stream.client;
 
 import java.text.DecimalFormat;
+import java.util.Arrays;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import com.lmax.disruptor.EventFactory;
-import com.lmax.disruptor.EventHandler;
 import com.lmax.disruptor.ExceptionHandler;
 import com.lmax.disruptor.YieldingWaitStrategy;
 import com.lmax.disruptor.dsl.Disruptor;
 import com.lmax.disruptor.dsl.ProducerType;
 import com.nhb.common.Loggable;
+import com.nhb.common.data.PuElement;
 import com.nhb.common.data.PuObject;
 import com.nhb.common.utils.TimeWatcher;
 import com.nhb.messaging.zmq.ZMQSocketFactory;
@@ -38,14 +39,13 @@ public class DisruptorStreamClient extends ZeroMQTest implements Loggable {
 		new DisruptorStreamClient().runTest();
 	}
 
-	@SuppressWarnings("unchecked")
 	@Override
 	protected void test() throws Exception {
 		DecimalFormat df = new DecimalFormat("###,###.##");
 		final TimeWatcher timeWatcher = new TimeWatcher();
 
 		final int total = (int) 1e6;
-		int numWorker = 8;
+		int numWorker = 3;
 
 		PuObject msg = new PuObject();
 		msg.setBoolean("boolVal", true);
@@ -55,10 +55,11 @@ public class DisruptorStreamClient extends ZeroMQTest implements Loggable {
 		msg.setLong("longVal", Long.MAX_VALUE);
 		msg.setFloat("floatVal", Float.MAX_VALUE);
 		msg.setDouble("doubleVal", Double.MAX_VALUE);
-		msg.setString("stringVal", "Nguyễn Hoàng Bách");
+		msg.setString("stringVal", "Nguyễn Hoàng Bách1");
 
 		// just calculate length of data
 		byte[] msgBytes = msg.toBytes();
+		getLogger().debug("Message to be sent: {}", Arrays.toString(msgBytes));
 		int msgSize = msgBytes.length;
 		msgBytes = null;
 		// done calculate
@@ -82,18 +83,16 @@ public class DisruptorStreamClient extends ZeroMQTest implements Loggable {
 				, ProducerType.SINGLE //
 				, new YieldingWaitStrategy());
 
-		ZMQStreamSocketSender[] handlers = ZMQStreamSocketSender.createHandlers(numWorker, BUFFER_SIZE,
-				new ZMQSocketFactory(this.getSocketRegistry(), "tcp://localhost:8787", ZMQSocketType.STREAM_CONNECT));
-
 		final CountDownLatch doneSignal = new CountDownLatch(1);
+		ZMQStreamSocketSender[] handlers = ZMQStreamSocketSender.createHandlers(numWorker, BUFFER_SIZE,
+				new ZMQSocketFactory(this.getSocketRegistry(), "tcp://localhost:8787", ZMQSocketType.CLIENT), 1,
+				BUFFER_SIZE, new ZMQSocketMessageHandler() {
 
-		disruptor.handleEventsWithWorkerPool(handlers)//
-				.then(new EventHandler<MessageBufferEvent>() {
-					private int countDown = total;
+					private AtomicInteger countDown = new AtomicInteger(total);
 
 					@Override
-					public void onEvent(MessageBufferEvent event, long sequence, boolean endOfBatch) throws Exception {
-						if (--this.countDown == 0) {
+					public void onMessage(PuElement message) {
+						if (this.countDown.decrementAndGet() == 0) {
 							doneSignal.countDown();
 						} else {
 							// if (countDown % 100 == 0) {
@@ -101,8 +100,9 @@ public class DisruptorStreamClient extends ZeroMQTest implements Loggable {
 							// }
 						}
 					}
-				}) //
-		;
+				});
+
+		disruptor.handleEventsWithWorkerPool(handlers);
 
 		disruptor.setDefaultExceptionHandler(new ExceptionHandler<MessageBufferEvent>() {
 
@@ -157,8 +157,8 @@ public class DisruptorStreamClient extends ZeroMQTest implements Loggable {
 				+ (df.format(dataGB * 1e9 / timeNano) + " GB/s"));
 		System.out.println("TPS: " + df.format(Double.valueOf(total) * 1e9 / timeNano));
 
-		Thread.sleep(1000l);
-		disruptor.shutdown();
-		System.exit(0);
+		// Thread.sleep(1000l);
+		// disruptor.shutdown();
+		// System.exit(0);
 	}
 }

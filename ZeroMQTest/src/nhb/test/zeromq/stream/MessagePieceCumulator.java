@@ -1,4 +1,4 @@
-package nhb.test.zeromq.stream.server;
+package nhb.test.zeromq.stream;
 
 import java.util.LinkedList;
 import java.util.List;
@@ -42,7 +42,7 @@ public class MessagePieceCumulator implements Loggable {
 		if (bytes == null || bytes.length == 0) {
 			return null;
 		}
-		// System.out.println("Adding " + bytes.length + " bytes data");
+		// getLogger().debug("Adding {} bytes data", bytes.length);
 		this.buffer.ensureWritable(bytes.length);
 		this.buffer.writeBytes(bytes);
 		// System.out.println("Added successful...");

@@ -4,7 +4,6 @@ import java.util.List;
 
 import com.lmax.disruptor.EventFactory;
 import com.nhb.common.data.PuElement;
-import com.nhb.common.vo.ByteArrayWrapper;
 
 import lombok.AccessLevel;
 import lombok.Getter;
@@ -15,10 +14,10 @@ public class MessagePieceEvent {
 	@Setter
 	@Getter
 	private long sequence;
-	
+
 	@Getter
 	@Setter(AccessLevel.PACKAGE)
-	private ByteArrayWrapper id;
+	private int id;
 
 	@Getter
 	@Setter(AccessLevel.PACKAGE)
