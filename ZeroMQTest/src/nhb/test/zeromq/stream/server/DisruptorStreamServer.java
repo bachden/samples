@@ -19,6 +19,7 @@ import com.nhb.messaging.zmq.ZMQSocket;
 import com.nhb.messaging.zmq.ZMQSocketType;
 
 import nhb.test.zeromq.ZeroMQTest;
+import nhb.test.zeromq.stream.MultiBufferBatchEventProcessor;
 
 public class DisruptorStreamServer extends ZeroMQTest {
 
@@ -136,15 +137,16 @@ public class DisruptorStreamServer extends ZeroMQTest {
 					MultiBufferBatchEventProcessor<MessagePieceEvent> processor = new MultiBufferBatchEventProcessor<MessagePieceEvent>(
 							ringBuffers, barriers, new EventHandler<MessagePieceEvent>() {
 
-								// private int count = 0;
+								private int count = 0;
 
 								@Override
 								public void onEvent(MessagePieceEvent event, long sequence, boolean endOfBatch)
 										throws Exception {
 									if (event.getExtractedMessages() != null) {
-										// count += event.getExtractedMessages().size();
-										// getLogger().debug("Received messages: {}, first one: {}", count,
-										// event.getExtractedMessages().get(0));
+										count += event.getExtractedMessages().size();
+										if (count % 1000 == 0) {
+											getLogger().debug("Total received messages: {}", count);
+										}
 
 										for (PuElement message : event.getExtractedMessages()) {
 											// getLogger().debug("Sending response...");

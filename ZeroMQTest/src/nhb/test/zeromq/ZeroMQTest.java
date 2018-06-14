@@ -1,5 +1,6 @@
 package nhb.test.zeromq;
 
+import org.zeromq.ZMQ;
 import org.zeromq.ZMQ.Socket;
 
 import com.nhb.common.Loggable;
@@ -11,6 +12,10 @@ import lombok.AccessLevel;
 import lombok.Getter;
 
 public abstract class ZeroMQTest implements Loggable {
+
+	static {
+		System.setProperty("java.library.path", "/usr/local/lib");
+	}
 
 	@Getter(AccessLevel.PROTECTED)
 	private final ZMQSocketRegistry socketRegistry = new ZMQSocketRegistry(4, true);
@@ -25,6 +30,7 @@ public abstract class ZeroMQTest implements Loggable {
 
 	public final void runTest() {
 		try {
+			getLogger().debug("ZMQ version: " + ZMQ.getVersionString());
 			this.test();
 		} catch (Exception e) {
 			throw new RuntimeException(e);

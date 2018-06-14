@@ -8,11 +8,6 @@
 		<Property name="debug-pattern-layout">%d{yyyy-MM-dd HH:mm:ss.SSS} [%t] %-5level %logger{36} (%F:%L) - %msg%n</Property>
 	</Properties>
 	<Appenders>
-		<!-- <SMTP name="sendEmailToBachNHAppender" smtpPort="25" subject="[TAP - Mario Consumer]" smtpUsername="tracer" smtpPassword="tap123456" to="thanhlv@tapstudiovn.com" 
-			from="tracer@tapstudiovn.com" -->
-		<!-- smtpHost="10.111.50.83" bufferSize="50"> -->
-		<!-- <PatternLayout pattern="${default-pattern-layout}" /> -->
-		<!-- </SMTP> -->
 		<RollingRandomAccessFile name="fileOutputLog" immediateFlush="false" append="true" fileName="${log-path}/console.log"
 			filePattern="${log-path}/console-%d{yyyy-MM-dd}-%d{HH}-%i.log">
 			<PatternLayout pattern="${default-pattern-layout}" />
@@ -25,52 +20,11 @@
 		<Console name="console" target="SYSTEM_OUT">
 			<PatternLayout pattern="${debug-pattern-layout}" />
 		</Console>
-		<RollingRandomAccessFile name="fileOutputLogBlankInfo" immediateFlush="true" append="true" fileName="${log-path}/console.log"
-			filePattern="${log-path}/console-%d{yyyy-MM-dd}-%d{HH}-%i.log">
-			<PatternLayout pattern="${blank-pattern-layout}" />
-			<Policies>
-				<TimeBasedTriggeringPolicy interval="1" modulate="true" />
-				<SizeBasedTriggeringPolicy size="64MB" />
-			</Policies>
-		</RollingRandomAccessFile>
-		<Console name="consoleBlankInfo" target="SYSTEM_OUT">
-			<PatternLayout pattern="${blank-pattern-layout}" />
-		</Console>
-		<Console name="consoleThreadNameOnly" target="SYSTEM_OUT">
-			<PatternLayout pattern="${only-thread-name-layout}" />
-		</Console>
-
-		<!-- <logFaces name="logFacesTCP" application="mario-test" protocol="tcp" remoteHost="localhost" port="55200" backup="fileOutputLog" /> -->
-		<!-- <logFaces name="logFacesUDP" application="mario-test" protocol="udp" remoteHost="localhost" port="55201" backup="fileOutputLog" /> -->
 	</Appenders>
 	<Loggers>
-		<Root level="info" includeLocation="false">
+		<Root level="debug" includeLocation="true">
 			<AppenderRef ref="fileOutputLog" />
-			<!-- <AppenderRef ref="console" /> -->
+			<AppenderRef ref="console" />
 		</Root>
-		<Logger name="pureLogger" additivity="false" level="info">
-			<AppenderRef ref="fileOutputLogBlankInfo" />
-			<AppenderRef ref="consoleBlankInfo" />
-		</Logger>
-		<Logger name="errorLogger" additivity="false" level="debug" includeLocation="false">
-			<AppenderRef ref="fileOutputLog" />
-		</Logger>
-		<Logger name="onlyThreadName" additivity="false" level="debug">
-			<AppenderRef ref="consoleThreadNameOnly" />
-		</Logger>
-		<Logger name="com" additivity="true" level="debug" includeLocation="true">
-			<AppenderRef ref="console" />
-			<!-- <AppenderRef ref="logFacesUDP" /> -->
-		</Logger>
-		<Logger name="com.datastax.driver" additivity="true" level="info" includeLocation="true" />
-		<Logger name="org.I0Itec" additivity="true" level="debug" includeLocation="true">
-			<AppenderRef ref="console" />
-		</Logger>
-		<Logger name="nhb" additivity="true" level="debug" includeLocation="true">
-			<AppenderRef ref="console" />
-		</Logger>
-		<!-- <Logger name="sendEmailToWatchmans" additivity="false" level="info" includeLocation="true"> -->
-		<!-- <AppenderRef ref="sendEmailToBachNHAppender" /> -->
-		<!-- </Logger> -->
 	</Loggers>
 </Configuration>

@@ -1,4 +1,4 @@
-package nhb.test.zeromq.stream.server;
+package nhb.test.zeromq.stream;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 

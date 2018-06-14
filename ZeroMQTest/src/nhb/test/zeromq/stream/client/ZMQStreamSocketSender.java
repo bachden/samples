@@ -32,16 +32,16 @@ public class ZMQStreamSocketSender implements WorkHandler<MessageBufferEvent>, E
 			ZMQSocketFactory socketFactory, int handlingPoolSize, int handlingBufferSize,
 			ZMQSocketMessageHandler handler) {
 
+		// indicate bufferSize = 2^exponent
 		final int exponent = 13;
-		final int mask = sendingRingBufferSize * 2 - 1;
 
 		if (sendingPoolSize > 0) {
 			ZMQStreamSocketSender[] results = new ZMQStreamSocketSender[sendingPoolSize];
 			for (int i = 0; i < sendingPoolSize; i++) {
 				try {
 					final ZMQSocket socket = socketFactory.newSocket();
-					results[i] = new ZMQStreamSocketSender(socket, sendingRingBufferSize, mask, exponent,
-							handlingPoolSize, handlingBufferSize, handler);
+					results[i] = new ZMQStreamSocketSender(socket, sendingRingBufferSize, exponent, handlingPoolSize,
+							handlingBufferSize, handler);
 				} catch (Exception e) {
 					throw new RuntimeException("Exception while borrow object from socket pool", e);
 				}
@@ -56,17 +56,12 @@ public class ZMQStreamSocketSender implements WorkHandler<MessageBufferEvent>, E
 
 	private final int entrySize;
 	private Thread receiver;
-	// private final int mask;
-	// private final int exponent;
 
-	private ZMQStreamSocketSender(ZMQSocket socket, int ringBufferSize, int mask, int exponent, int handlingPoolSize,
+	private ZMQStreamSocketSender(ZMQSocket socket, int ringBufferSize, int exponent, int handlingPoolSize,
 			int handlingBufferSize, ZMQSocketMessageHandler handler) {
 		this.socket = socket;
 
-		// this.mask = mask;
-		// this.exponent = exponent;
 		this.entrySize = Double.valueOf(Math.pow(2, exponent)).intValue();
-		// this.buffer = ByteBuffer.allocateDirect(entrySize);
 		this.buffer = ByteBuffer.allocate(entrySize);
 
 		this.initReceiver(handlingPoolSize, handlingBufferSize, handler);
@@ -116,7 +111,7 @@ public class ZMQStreamSocketSender implements WorkHandler<MessageBufferEvent>, E
 						}
 					}
 				}
-				Thread.yield();
+				// Thread.yield();
 			}
 		});
 		receiver.start();
